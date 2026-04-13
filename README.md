@@ -19,7 +19,6 @@ Stellar Autopay demonstrates two cutting-edge primitives working together on the
 
 |                              |                                                                                                                                                                         |
 | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-                                                                                                                                     |
 | **Autopay Contract**         | [`CCGU4EROJG3XVYIRGE5TOYDVUOOCRSPUCSUF4QCHRY3KEBFVLQGS5NIS`](https://stellar.expert/explorer/testnet/contract/CCGU4EROJG3XVYIRGE5TOYDVUOOCRSPUCSUF4QCHRY3KEBFVLQGS5NIS) |
 | **Worker Schedule Contract** | [`CDRM3V5SVIZ3OWGZWDEUR6FQESPIVRB2VYPDIJ3XC4LS6BIBSRATPCFA`](https://stellar.expert/explorer/testnet/contract/CDRM3V5SVIZ3OWGZWDEUR6FQESPIVRB2VYPDIJ3XC4LS6BIBSRATPCFA) |
 | **Agent Wallet**             | [`GDYASMG4W3LFG5YQIUG7IHKVFTDO4SJPX2S2WJVJTQSUGRAULQ45GK7M`](https://stellar.expert/explorer/testnet/account/GDYASMG4W3LFG5YQIUG7IHKVFTDO4SJPX2S2WJVJTQSUGRAULQ45GK7M)  |
