@@ -62,7 +62,14 @@ User types: "Hire Alice for 3 days starting tomorrow,
          │  Worker Schedule     │    on-chain, UUID payment IDs
          └──────────────────────┘
 ```
+### Example Another Types
+Hire Murat  for 13,16,19 April  will be work start 13 april at 14.00,15.00,16.00,16 april at 12.00,13.00,14.00 and 19 april 21.00,22.00 hourse , $15/hour worth of XLM, day to GCEF3BTQVDJ473URMW4556VG67YAPS2J5OP77FBXT7T47M2DOIZ7TDAR
+<br>
+<img src="/1.jpg" alt="" width="600"/><br>
 
+### For Alice Detail
+<img src="/2.jpg" alt="" width="600"/><br>
+<img src="/3.jpg" alt="" width="600"/><br>
 ### What Gemini Parses
 
 The LLM receives a structured prompt with the user's local time, timezone offset, and free-text request. It returns a JSON object with:
