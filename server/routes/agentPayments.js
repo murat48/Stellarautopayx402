@@ -5,6 +5,8 @@ import {
   sendPayment,
   markPaidForAgent,
   recordPaymentForAgent,
+  updateNextDueForAgent,
+  updateStatusForAgent,
   fetchBalances,
   getAgentPublicKey,
 } from '../services/sorobanService.js';
@@ -15,6 +17,29 @@ import {
   sendPaymentReminder,
 } from '../services/telegramService.js';
 import { buildPaymentUrl } from '../services/paymentLinkService.js';
+
+// Month-aware next due date (mirrors server/services/reminderJob.js)
+function daysInMonth(year, month) {
+  return new Date(year, month + 1, 0).getDate();
+}
+function calculateNextDueDate(currentDueIso, frequency, dayOfMonth = 0) {
+  const current = new Date(currentDueIso);
+  if (frequency === 'weekly')   { current.setDate(current.getDate() + 7);  return current.toISOString(); }
+  if (frequency === 'biweekly') { current.setDate(current.getDate() + 14); return current.toISOString(); }
+  if (frequency === 'quarterly') { current.setMonth(current.getMonth() + 3); return current.toISOString(); }
+  if (frequency === 'monthly' || frequency === 'monthly_day') {
+    if (frequency === 'monthly_day' && dayOfMonth > 0) {
+      let nextYear = current.getFullYear();
+      let nextMonth = current.getMonth() + 1;
+      if (nextMonth > 11) { nextMonth = 0; nextYear++; }
+      const day = Math.min(dayOfMonth, daysInMonth(nextYear, nextMonth));
+      return new Date(nextYear, nextMonth, day, current.getHours(), current.getMinutes(), current.getSeconds()).toISOString();
+    }
+    current.setMonth(current.getMonth() + 1);
+    return current.toISOString();
+  }
+  return current.toISOString();
+}
 
 const router = Router();
 
@@ -71,12 +96,29 @@ router.post('/pay/:id', async (req, res) => {
       console.error('❌ Failed to record payment:', recErr.message);
     }
 
-    // Mark bill as paid if payment succeeded
+    // Update contract state after successful payment
     if (paymentStatus === 'success') {
-      try {
-        await markPaidForAgent(agentPublicKey, bill.contractId);
-      } catch (markErr) {
-        console.error('❌ Failed to mark bill as paid:', markErr.message);
+      if (bill.type !== 'one-time') {
+        // Recurring: advance due date and reset to active
+        const nextDueDate = calculateNextDueDate(bill.nextDueDate, bill.frequency, bill.dayOfMonth ?? 0);
+        try {
+          await updateNextDueForAgent(agentPublicKey, bill.contractId, nextDueDate);
+          console.log(`📅 Bill "${bill.name}" rescheduled → ${nextDueDate}`);
+        } catch (markErr) {
+          console.error('❌ Failed to update next due:', markErr.message);
+        }
+        try {
+          await updateStatusForAgent(agentPublicKey, bill.contractId, 'active');
+        } catch (markErr) {
+          console.error('❌ Failed to reset status to active:', markErr.message);
+        }
+      } else {
+        // One-time: mark as paid (terminal state)
+        try {
+          await markPaidForAgent(agentPublicKey, bill.contractId);
+        } catch (markErr) {
+          console.error('❌ Failed to mark bill as paid:', markErr.message);
+        }
       }
     }
 

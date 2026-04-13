@@ -19,6 +19,32 @@ const CACHE_KEY     = 'stellar_autopay_bills_cache';
 // This does NOT trigger transactions — it only blocks them.
 const PAID_KEYS_KEY = 'stellar_autopay_paid_keys';
 
+// ── Date helpers (duplicated from usePaymentEngine to avoid circular dep) ──
+function daysInMonth(year, month) {
+  return new Date(year, month + 1, 0).getDate();
+}
+function effectiveDayForMonth(targetDay, year, month) {
+  return Math.min(targetDay, daysInMonth(year, month));
+}
+function calcNextDueDate(currentDueIso, frequency, dayOfMonth = 0) {
+  const current = new Date(currentDueIso);
+  if (frequency === 'weekly') { current.setDate(current.getDate() + 7); return current.toISOString(); }
+  if (frequency === 'biweekly') { current.setDate(current.getDate() + 14); return current.toISOString(); }
+  if (frequency === 'quarterly') { current.setMonth(current.getMonth() + 3); return current.toISOString(); }
+  if (frequency === 'monthly' || frequency === 'monthly_day') {
+    if (frequency === 'monthly_day' && dayOfMonth > 0) {
+      let nextYear = current.getFullYear();
+      let nextMonth = current.getMonth() + 1;
+      if (nextMonth > 11) { nextMonth = 0; nextYear++; }
+      const day = effectiveDayForMonth(dayOfMonth, nextYear, nextMonth);
+      return new Date(nextYear, nextMonth, day, current.getHours(), current.getMinutes(), current.getSeconds()).toISOString();
+    }
+    current.setMonth(current.getMonth() + 1);
+    return current.toISOString();
+  }
+  return current.toISOString();
+}
+
 function loadCache() {
   try {
     const raw = localStorage.getItem(CACHE_KEY);
@@ -266,17 +292,51 @@ export default function useBills(publicKey, signTransaction, getSessionKeypair) 
     console.warn('mark_paid permanently failed — paid-keys guard prevents re-payment on reload.');
   }, [publicKey, getSessionKeypair, bills]); // eslint-disable-line
 
+  // ── Reschedule a stuck recurring bill ────────────────────────────────────
+  // Used when a recurring bill ended up with status=paid but nextDueDate was
+  // never advanced (e.g. update_next_due failed after the payment tx).
+  // Wallet-signed — will open the wallet kit popup.
+  const rescheduleBill = useCallback(async (id) => {
+    const bill = bills.find((b) => b.id === id);
+    if (!bill || !publicKey) return;
+    if (bill.type === 'one-time') return; // one-time bills can't be rescheduled
+    if (bill.status !== 'paid' && bill.status !== 'completed') return;
+
+    const signFn = getWalletSignFn();
+    if (!signFn) { setError('Wallet not connected'); return; }
+
+    const nextDueDate = calcNextDueDate(bill.nextDueDate, bill.frequency, bill.dayOfMonth ?? 0);
+
+    // Optimistic update
+    setBills((prev) =>
+      prev.map((b) => (b.id === id ? { ...b, nextDueDate, status: 'active' } : b))
+    );
+    setError(null);
+
+    try {
+      await updateNextDue(publicKey, signFn, bill.contractId, nextDueDate);
+      await updateStatus(publicKey, signFn, bill.contractId, 'active');
+    } catch (e) {
+      setError('Failed to reschedule: ' + (e?.message || String(e)));
+      // Revert optimistic update
+      setBills((prev) =>
+        prev.map((b) => (b.id === id ? { ...b, nextDueDate: bill.nextDueDate, status: bill.status } : b))
+      );
+    }
+  }, [publicKey, signTransaction, bills]); // eslint-disable-line
+
   return {
     bills,
     contractReady,
     loading,
     error,
-    addBill:    addBillFn,
-    pauseBill:  pauseBillFn,
-    deleteBill: deleteBillFn,
+    addBill:       addBillFn,
+    pauseBill:     pauseBillFn,
+    deleteBill:    deleteBillFn,
     updateBill,
     completeBill,
     markBillPaid,
-    refreshBills: fetchBills,
+    rescheduleBill,
+    refreshBills:  fetchBills,
   };
 }

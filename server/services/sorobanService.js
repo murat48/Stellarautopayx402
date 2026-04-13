@@ -245,6 +245,35 @@ export async function markPaidForAgent(agentPublicKey, billId) {
   );
 }
 
+/** Advance the next_due date on-chain. nextDueIso is an ISO string. */
+export async function updateNextDueForAgent(agentPublicKey, billId, nextDueIso) {
+  const ts = BigInt(Math.floor(new Date(nextDueIso).getTime() / 1000));
+  return invokeContract(
+    agentPublicKey, 'update_next_due',
+    addr(agentPublicKey),
+    u64(billId),
+    u64(ts),
+  );
+}
+
+/** Update the status of a bill on-chain. status is a frontend string like 'active'. */
+export async function updateStatusForAgent(agentPublicKey, billId, status) {
+  const statusTagMap = {
+    active:      'Active',
+    paused:      'Paused',
+    completed:   'Completed',
+    low_balance: 'LowBalance',
+    paid:        'Paid',
+  };
+  const tag = statusTagMap[status] || 'Active';
+  return invokeContract(
+    agentPublicKey, 'update_status',
+    addr(agentPublicKey),
+    u64(billId),
+    enumV(tag),
+  );
+}
+
 export async function recordPaymentForAgent(agentPublicKey, entry) {
   const statusTagMap = { success: 'Success', failed: 'Failed', skipped: 'Skipped' };
   const statusTag = statusTagMap[entry.status] ?? 'Failed';

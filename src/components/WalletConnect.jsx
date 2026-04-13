@@ -127,7 +127,7 @@ export default function WalletConnect({ onConnect, loading, error }) {
             Create one here
           </a>
           {' · '}
-          <a href="https://github.com/murat48/stellarautopay" target="_blank" rel="noreferrer">
+          <a href="https://github.com/murat48/Stellarautopayx402" target="_blank" rel="noreferrer">
             GitHub ↗
           </a>
           {' · '}

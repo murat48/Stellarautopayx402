@@ -16,11 +16,35 @@
 import {
   getAllBills, getAgentPublicKey,
   sendPayment, markPaidForAgent, recordPaymentForAgent,
+  updateNextDueForAgent, updateStatusForAgent,
   getAllWorkerSchedules, getPendingWorkerPayments, setWorkerPaymentStatus,
 } from './sorobanService.js';
 import { getChatId, getDefaultChatId, sendPaymentConfirmation, sendMessage } from './telegramService.js';
 import { buildPaymentUrl } from './paymentLinkService.js';
 import config from '../config.js';
+
+// ─── Month-aware next due date calculation ─────────────────────────────────
+function daysInMonth(year, month) {
+  return new Date(year, month + 1, 0).getDate();
+}
+function calculateNextDueDate(currentDueIso, frequency, dayOfMonth = 0) {
+  const current = new Date(currentDueIso);
+  if (frequency === 'weekly')   { current.setDate(current.getDate() + 7);  return current.toISOString(); }
+  if (frequency === 'biweekly') { current.setDate(current.getDate() + 14); return current.toISOString(); }
+  if (frequency === 'quarterly') { current.setMonth(current.getMonth() + 3); return current.toISOString(); }
+  if (frequency === 'monthly' || frequency === 'monthly_day') {
+    if (frequency === 'monthly_day' && dayOfMonth > 0) {
+      let nextYear = current.getFullYear();
+      let nextMonth = current.getMonth() + 1;
+      if (nextMonth > 11) { nextMonth = 0; nextYear++; }
+      const day = Math.min(dayOfMonth, daysInMonth(nextYear, nextMonth));
+      return new Date(nextYear, nextMonth, day, current.getHours(), current.getMinutes(), current.getSeconds()).toISOString();
+    }
+    current.setMonth(current.getMonth() + 1);
+    return current.toISOString();
+  }
+  return current.toISOString();
+}
 
 // ─── Live XLM price from CoinGecko (free, no API key) ────────────────────────
 let _priceCache = { price: null, fetchedAt: 0 };
@@ -72,6 +96,27 @@ async function runCheck() {
   const now = Date.now();
   const agentKey = getAgentPublicKey();
 
+  // ── Auto-recovery: fix recurring bills stuck in 'paid' state ──────────────
+  // If a previous run paid the bill but crashed before updating nextDue/status,
+  // the bill remains 'paid' forever. Detect and heal automatically.
+  for (const bill of bills) {
+    if (bill.type === 'one-time') continue;
+    if (bill.status !== 'paid') continue;
+    // nextDueDate is the date that was paid; advance it one period into the future
+    const nextDueDate = calculateNextDueDate(bill.nextDueDate, bill.frequency, bill.dayOfMonth ?? 0);
+    console.log(`🔧 Auto-recovery: rescheduling stuck recurring bill "${bill.name}" → ${nextDueDate}`);
+    try {
+      await updateNextDueForAgent(agentKey, bill.contractId, nextDueDate);
+    } catch (e) {
+      console.error(`❌ Auto-recovery updateNextDue failed for "${bill.name}":`, e.message);
+    }
+    try {
+      await updateStatusForAgent(agentKey, bill.contractId, 'active');
+    } catch (e) {
+      console.error(`❌ Auto-recovery updateStatus failed for "${bill.name}":`, e.message);
+    }
+  }
+
   for (const bill of bills) {
     if (bill.status === 'paid' || bill.status === 'completed' || bill.status === 'paused') continue;
 
@@ -99,9 +144,26 @@ async function runCheck() {
     }
 
     if (paymentOk) {
-      // ── 2. Mark paid in contract ─────────────────────────────────────────
-      try { await markPaidForAgent(agentKey, bill.contractId); } catch (e) {
-        console.error('❌ markPaid error:', e.message);
+      // ── 2. Advance next_due (recurring) OR mark paid (one-time) ────────────
+      if (bill.type !== 'one-time') {
+        // Recurring: advance due date and reset to active — do NOT mark_paid
+        const nextDueDate = calculateNextDueDate(bill.nextDueDate, bill.frequency, bill.dayOfMonth ?? 0);
+        try {
+          await updateNextDueForAgent(agentKey, bill.contractId, nextDueDate);
+          console.log(`📅 Bill "${bill.name}" rescheduled → ${nextDueDate}`);
+        } catch (e) {
+          console.error('❌ updateNextDue error:', e.message);
+        }
+        try {
+          await updateStatusForAgent(agentKey, bill.contractId, 'active');
+        } catch (e) {
+          console.error('❌ updateStatus(active) error:', e.message);
+        }
+      } else {
+        // One-time: mark as paid (terminal state)
+        try { await markPaidForAgent(agentKey, bill.contractId); } catch (e) {
+          console.error('❌ markPaid error:', e.message);
+        }
       }
 
       // ── 3. Record payment history ─────────────────────────────────────────

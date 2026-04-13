@@ -18,7 +18,7 @@ import WorkerSchedules from './components/WorkerSchedules';
 
 function App() {
   const wallet = useWallet();
-  const { bills, addBill, updateBill, completeBill, markBillPaid, pauseBill, deleteBill, fetchBills, contractReady, loading: billsLoading, error: billsError } = useBills(
+  const { bills, addBill, updateBill, completeBill, markBillPaid, pauseBill, deleteBill, rescheduleBill, fetchBills, contractReady, loading: billsLoading, error: billsError } = useBills(
     wallet.publicKey,
     wallet.signTransaction,
     wallet.getSessionKeypair
@@ -137,6 +137,7 @@ function App() {
               addBill={addBill}
               pauseBill={pauseBill}
               deleteBill={deleteBill}
+              rescheduleBill={rescheduleBill}
               refreshBills={fetchBills}
               billsLoading={billsLoading}
             />

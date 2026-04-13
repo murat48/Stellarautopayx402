@@ -236,8 +236,11 @@ export default function usePaymentEngine(publicKey, getSessionKeypair, autoPayEn
       if (bill.type === 'one-time') {
         markBillPaid(bill.id, contractSignFn).catch((e) => console.warn('mark_paid failed:', e?.message));
       } else {
+        // Reset status to active so the bill re-appears as scheduled for the next cycle.
+        // Without this, if the contract somehow has status=paid, the bill gets stuck forever.
         updateBill(bill.id, {
           nextDueDate: calculateNextDueDate(bill.nextDueDate, bill.frequency, bill.dayOfMonth ?? 0),
+          status: 'active',
         }, contractSignFn).catch((e) => console.warn('update_next_due failed:', e?.message));
       }
 

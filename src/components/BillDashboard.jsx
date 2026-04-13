@@ -30,7 +30,7 @@ function formatDate(iso) {
   });
 }
 
-export default function BillDashboard({ bills, addBill, pauseBill, deleteBill, refreshBills, billsLoading }) {
+export default function BillDashboard({ bills, addBill, pauseBill, deleteBill, rescheduleBill, refreshBills, billsLoading }) {
   const [showForm, setShowForm] = useState(false);
   const [filter, setFilter] = useState('unpaid');
   const [paymentLinks, setPaymentLinks] = useState({}); // billId → { loading, url, error }
@@ -156,6 +156,17 @@ export default function BillDashboard({ bills, addBill, pauseBill, deleteBill, r
                   </button>
                   <button onClick={() => deleteBill(bill.id)} className="btn-danger">
                     🗑 Delete
+                  </button>
+                </div>
+              )}
+              {bill.status === 'paid' && bill.type !== 'one-time' && (
+                <div className="bill-card-actions">
+                  <button
+                    onClick={() => rescheduleBill(bill.id)}
+                    className="btn-secondary"
+                    title="Advance the due date by one period and set back to active"
+                  >
+                    ↻ Reschedule
                   </button>
                 </div>
               )}
