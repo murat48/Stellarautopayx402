@@ -1,0 +1,20 @@
+{
+  "name": "stellar-autopay-agent-api",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "@google/genai": "^1.49.0",
+    "@stellar/stellar-sdk": "^15.0.1",
+    "@x402/core": "latest",
+    "@x402/express": "latest",
+    "@x402/fetch": "latest",
+    "@x402/stellar": "latest",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.0",
+    "express": "^4.21.0"
+  }
+}

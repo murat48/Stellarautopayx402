@@ -1,0 +1,1 @@
+/home/muratkeskin/stellaragentoagent/stellarautopayv2/contracts/worker-schedule/target/wasm32-unknown-unknown/release/worker_schedule_contract.wasm: /home/muratkeskin/stellaragentoagent/stellarautopayv2/contracts/worker-schedule/src/lib.rs
